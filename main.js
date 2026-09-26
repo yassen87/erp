@@ -15,11 +15,7 @@ apiApp.use(cors());
 apiApp.use(express.json({ limit: '50mb' }));
 apiApp.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// خدمة ملف الواجهة
-apiApp.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
+// مسارات API يجب أن تكون قبل خدمة الملفات الثابتة
 // مسار للحصول على حالة الواتساب
 apiApp.get('/api/status', (req, res) => {
     res.json({ status: currentStatus, qr: currentQR });
@@ -59,6 +55,23 @@ apiApp.post('/api/send-message', async (req, res) => {
         return res.status(500).json({ success: false, error: err.message });
     }
 });
+
+// خدمة الملفات الثابتة من مشروع React المبني
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+    apiApp.use(express.static(distPath));
+
+    // خدمة SPA - جميع المسارات غير المعرفة تذهب إلى index.html
+    apiApp.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api/')) return next();
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    // Fallback للواجهة القديمة في حالة عدم وجود build
+    apiApp.get('/', (req, res) => {
+        res.sendFile(path.join(__dirname, 'index.html'));
+    });
+}
 
 apiApp.listen(3000, () => {
     console.log('WhatsApp Web Service running on port 3000');

@@ -1,11 +1,15 @@
 {
   "name": "whatsapp-service",
   "version": "1.0.0",
-  "description": "WhatsApp Desktop App with API",
+  "description": "WhatsApp Desktop App with API + React UI",
   "main": "main.js",
   "scripts": {
     "start": "node main.js",
-    "dev": "node main.js"
+    "dev": "node main.js",
+    "install:frontend": "cd frontend && npm install",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "npm run build:frontend",
+    "setup": "npm install && npm run install:frontend && npm run build"
   },
   "dependencies": {
     "archiver": "^8.0.0",
