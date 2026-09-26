@@ -84,10 +84,10 @@
 <div class="container" id="login-section">
     <h1>ربط واتساب بالبرنامج</h1>
     <p>قم بفتح تطبيق الواتساب على هاتفك، اذهب إلى الأجهزة المرتبطة، وصور الكود التالي:</p>
-    <div id="qr-container">
+    <div id="qr-container" class="hidden">
         <img id="qr-image" src="" alt="جاري تحميل الكود... انتظر لحظات">
     </div>
-    <div class="status" id="login-status">جاري الاتصال بسيرفر واتساب...</div>
+    <div class="status" id="login-status">جاري الاتصال بسيرفر واتساب... برجاء الانتظار</div>
 </div>
 
 <!-- صفحة Call Center -->
@@ -114,18 +114,41 @@
 </div>
 
 <script>
-    // استقبال الـ QR Code من الواتساب وعرضه
-    window.whatsapp.onQR((qrData) => {
-        document.getElementById('qr-image').src = qrData;
-        document.getElementById('login-status').innerText = 'يرجى مسح الكود بهاتفك لإتمام الربط';
-        document.getElementById('login-status').style.color = '#fff';
-    });
+    let isReady = false;
 
-    // عند نجاح تسجيل الدخول
-    window.whatsapp.onReady(() => {
-        document.getElementById('login-section').classList.add('hidden');
-        document.getElementById('dashboard-section').classList.remove('hidden');
-    });
+    // دالة لجلب حالة الواتساب كل ثانيتين
+    async function checkStatus() {
+        if (isReady) return;
+        
+        try {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            
+            if (data.status === 'needs_scan' && data.qr) {
+                document.getElementById('qr-container').classList.remove('hidden');
+                document.getElementById('qr-image').src = data.qr;
+                document.getElementById('login-status').innerText = 'يرجى مسح الكود بهاتفك لإتمام الربط';
+                document.getElementById('login-status').style.color = '#fff';
+            } 
+            else if (data.status === 'ready') {
+                isReady = true;
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('dashboard-section').classList.remove('hidden');
+            }
+            else if (data.status === 'initializing') {
+                document.getElementById('login-status').innerText = 'جاري الاتصال بسيرفر واتساب... برجاء الانتظار';
+            }
+        } catch (err) {
+            console.error('Error fetching status:', err);
+        }
+
+        if (!isReady) {
+            setTimeout(checkStatus, 2000);
+        }
+    }
+
+    // بدء الفحص
+    checkStatus();
 
     // دالة إرسال الرسالة من الواجهة
     async function sendMsg() {
@@ -142,13 +165,24 @@
         statusDiv.innerText = 'جاري الإرسال...';
         statusDiv.style.color = 'var(--text-muted)';
         
-        // إرسال البيانات للـ Backend الخاص بنا
-        const res = await window.whatsapp.sendMessage(phone, text);
-        if(res.success) {
-            statusDiv.innerText = 'تم إرسال الرسالة بنجاح ✅';
-            statusDiv.style.color = 'var(--primary)';
-        } else {
-            statusDiv.innerText = 'حدث خطأ: ' + res.error;
+        try {
+            const res = await fetch('/api/send-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, message: text })
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                statusDiv.innerText = 'تم إرسال الرسالة بنجاح ✅';
+                statusDiv.style.color = 'var(--primary)';
+                document.getElementById('messageText').value = '';
+            } else {
+                statusDiv.innerText = 'حدث خطأ: ' + data.error;
+                statusDiv.style.color = '#ff5252';
+            }
+        } catch(err) {
+            statusDiv.innerText = 'فشل الاتصال بالسيرفر';
             statusDiv.style.color = '#ff5252';
         }
     }
